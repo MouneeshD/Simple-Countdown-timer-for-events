@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Countdown Timer — Upcoming Event</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #101010;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+    }
+    header {
+      margin-bottom: 20px;
+    }
+    .muted {
+      color: rgba(255,255,255,0.6);
+      font-size: 0.9em;
+    }
+    .grid {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .card {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 10px;
+      flex: 1;
+      min-width: 280px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      margin-bottom: 5px;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      border-radius: 5px;
+      border: none;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 8px 12px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      margin-right: 5px;
+    }
+    .btn-primary { background: #007bff; color: white; }
+    .btn-ghost { background: transparent; color: white; border: 1px solid rgba(255,255,255,0.3); }
+    .countdown {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 20px;
+      font-size: 1.5em;
+    }
+    .time-box {
+      text-align: center;
+    }
+    .progress-wrap {
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      margin-top: 20px;
+    }
+    .progress {
+      height: 8px;
+      background: #007bff;
+      border-radius: 4px;
+      width: 0%;
+    }
+    .history {
+      margin-top: 15px;
+    }
+    .history-item {
+      font-size: 0.85em;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Countdown Timer — Upcoming Event</h1>
+      <p class="lead">Create a lightweight, trustworthy timer for any upcoming event. Your event will be saved locally.</p>
+      <div class="muted">Local time: <span id="localTime">--:--:--</span></div>
+    </header>
+
+    <div class="grid">
+      <!-- Controls -->
+      <section class="card">
+        <h2 style="font-size:16px;margin-bottom:10px;">Event details</h2>
+        <label for="eventName">Event name</label>
+        <input id="eventName" type="text" placeholder="e.g., Graduation Party">
+
+        <label for="eventDate">Event date & time (local)</label>
+        <input id="eventDate" type="datetime-local">
+
+        <div>
+          <button id="saveBtn" class="btn-primary">Save & Start</button>
+          <button id="clearBtn" class="btn-ghost">Clear</button>
+        </div>
+
+        <div class="muted" style="margin-top:10px;">Tips: Use full date and time; timer persists until cleared.</div>
+
+        <hr style="margin:15px 0;border:none;border-top:1px solid rgba(255,255,255,0.1);">
+
+        <h3 style="font-size:14px;">Saved event</h3>
+        <div class="muted" id="savedInfo">No saved event</div>
+
+        <div class="history">
+          <h3 style="font-size:14px;">Event history</h3>
+          <div id="eventHistory" class="muted">No history yet</div>
+        </div>
+      </section>
+
+      <!-- Countdown -->
+      <aside class="card timer-area">
+        <div style="text-align:center">
+          <div class="event-title" id="displayTitle">—</div>
+          <small id="displayDate" class="muted">—</small>
+        </div>
+
+        <div class="countdown" id="countdown">
+          <div class="time-box">
+            <div id="days">--</div>
+            <div class="time-label">Days</div>
+          </div>
+          <div class="time-box">
+            <div id="hours">--</div>
+            <div class="time-label">Hours</div>
+          </div>
+          <div class="time-box">
+            <div id="minutes">--</div>
+            <div class="time-label">Minutes</div>
+          </div>
+          <div class="time-box">
+            <div id="seconds">--</div>
+            <div class="time-label">Seconds</div>
+          </div>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress" id="progressBar"></div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <small id="countdownStatus">No event set</small>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const eventNameInput = document.getElementById("eventName");
+    const eventDateInput = document.getElementById("eventDate");
+    const saveBtn = document.getElementById("saveBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const savedInfo = document.getElementById("savedInfo");
+    const eventHistoryDiv = document.getElementById("eventHistory");
+
+    const displayTitle = document.getElementById("displayTitle");
+    const displayDate = document.getElementById("displayDate");
+    const daysEl = document.getElementById("days");
+    const hoursEl = document.getElementById("hours");
+    const minutesEl = document.getElementById("minutes");
+    const secondsEl = document.getElementById("seconds");
+    const countdownStatus = document.getElementById("countdownStatus");
+    const progressBar = document.getElementById("progressBar");
+    const localTimeEl = document.getElementById("localTime");
+
+    let timer;
+    let startTime;
+    let endTime;
+
+    // Restrict to future dates only
+    function setMinDate() {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      eventDateInput.min = now.toISOString().slice(0,16);
+    }
+    setMinDate();
+
+    // Update local time every second
+    setInterval(() => {
+      localTimeEl.textContent = new Date().toLocaleTimeString();
+    }, 1000);
+
+    function loadHistory() {
+      const history = JSON.parse(localStorage.getItem("eventHistory") || "[]");
+      if (history.length === 0) {
+        eventHistoryDiv.textContent = "No history yet";
+        return;
+      }
+      eventHistoryDiv.innerHTML = "";
+      history.forEach(ev => {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.textContent = `${ev.name} — ${ev.date} (saved ${ev.savedAt})`;
+        eventHistoryDiv.appendChild(div);
+      });
+    }
+
+    function startCountdown(name, dateStr) {
+      const targetDate = new Date(dateStr);
+      startTime = Date.now();
+      endTime = targetDate.getTime();
+
+      displayTitle.textContent = name;
+      displayDate.textContent = targetDate.toLocaleString();
+
+      clearInterval(timer);
+      timer = setInterval(() => {
+        const now = Date.now();
+        const diff = endTime - now;
+
+        if (diff <= 0) {
+          clearInterval(timer);
+          daysEl.textContent = hoursEl.textContent = minutesEl.textContent = secondsEl.textContent = "00";
+          countdownStatus.textContent = "Event started!";
+          progressBar.style.width = "100%";
+          return;
+        }
+
+        const totalSeconds = Math.floor(diff / 1000);
+        const d = Math.floor(totalSeconds / (3600*24));
+        const h = Math.floor((totalSeconds % (3600*24)) / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+
+        daysEl.textContent = String(d).padStart(2,"0");
+        hoursEl.textContent = String(h).padStart(2,"0");
+        minutesEl.textContent = String(m).padStart(2,"0");
+        secondsEl.textContent = String(s).padStart(2,"0");
+
+        countdownStatus.textContent = "Counting down...";
+        const totalDuration = endTime - startTime;
+        const progress = ((now - startTime) / totalDuration) * 100;
+        progressBar.style.width = Math.min(progress, 100) + "%";
+      }, 1000);
+    }
+
+    saveBtn.addEventListener("click", () => {
+      const name = eventNameInput.value.trim();
+      const date = eventDateInput.value;
+      if (!name || !date) {
+        alert("Please enter event name and date.");
+        return;
+      }
+      const targetDate = new Date(date);
+      if (targetDate <= new Date()) {
+        alert("Please select a future date/time.");
+        return;
+      }
+      localStorage.setItem("savedEvent", JSON.stringify({name, date}));
+      savedInfo.textContent = `${name} — ${new Date(date).toLocaleString()}`;
+
+      const history = JSON.parse(localStorage.getItem("eventHistory") || "[]");
+      history.push({
+        name,
+        date: new Date(date).toLocaleString(),
+        savedAt: new Date().toLocaleString()
+      });
+      localStorage.setItem("eventHistory", JSON.stringify(history));
+
+      loadHistory();
+      startCountdown(name, date);
+    });
+
+    clearBtn.addEventListener("click", () => {
+      localStorage.removeItem("savedEvent");
+      savedInfo.textContent = "No saved event";
+      displayTitle.textContent = "—";
+      displayDate.textContent = "—";
+      clearInterval(timer);
+      daysEl.textContent = hoursEl.textContent = minutesEl.textContent = secondsEl.textContent = "--";
+      progressBar.style.width = "0%";
+      countdownStatus.textContent = "No event set";
+    });
+
+    // On load
+    const saved = JSON.parse(localStorage.getItem("savedEvent") || "null");
+    if (saved) {
+      savedInfo.textContent = `${saved.name} — ${new Date(saved.date).toLocaleString()}`;
+      startCountdown(saved.name, saved.date);
+    }
+    loadHistory();
+  </script>
+</body>
+</html>
